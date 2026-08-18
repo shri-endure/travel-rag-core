@@ -1,0 +1,17 @@
+.venv/
+venv/
+env/
+
+__pycache__/
+*.pyc
+
+.env
+.env.*
+
+.vscode/
+
+vector_db/
+chroma/
+*.faiss
+
+chroma_storage/

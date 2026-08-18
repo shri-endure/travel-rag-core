@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel RAG Assistant - AI Destination Guide</title>
+    <!-- Google Fonts & Libraries -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/static/style.css?v=10.0">
+</head>
+
+<body>
+
+    <!-- Header Bar -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="logo" onclick="resetToAllDestinations()">
+                <div class="logo-icon-box">
+                    <i data-lucide="compass" class="logo-icon-svg"></i>
+                </div>
+                <div>
+                    <h1>Travel RAG Assistant</h1>
+                    <p class="subtitle">AI Knowledge Base & Itinerary Planner</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div id="status-badge" class="badge ready">
+                    <span class="dot"></span> <span id="status-text">Gemini & Chroma Ready</span>
+                </div>
+                <button id="btn-ingest" class="btn btn-secondary btn-icon-gap" onclick="triggerIngestion()">
+                    <i data-lucide="refresh-cw" class="icon-sm"></i> Re-index Knowledge Base
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+
+        <!-- Top Destination Navigation & Breadcrumb Bar (Visible when destination is selected) -->
+        <div id="dest-top-bar" class="dest-top-bar hidden">
+            <button class="btn btn-back btn-icon-gap" onclick="resetToAllDestinations()">
+                <i data-lucide="arrow-left" class="icon-sm"></i> Back to All Destinations
+            </button>
+            <div class="dest-breadcrumb">
+                <span class="crumb-link" onclick="resetToAllDestinations()">Home</span>
+                <span class="crumb-sep">/</span>
+                <span id="dest-crumb-name" class="active-crumb">Goa</span>
+            </div>
+        </div>
+
+        <!-- Hero Header Text (Visible on Home) -->
+        <section id="hero-header-section" class="home-hero">
+            <h2>Discover India's Iconic Wonders</h2>
+            <p class="hero-subtext">Click on any destination stamp below to open its dedicated travel guide, or ask a question below.</p>
+        </section>
+
+        <!-- Generously Sized Vintage Stamp Cards Gallery -->
+        <section class="stamps-gallery-section">
+            <div class="stamps-row">
+
+                <!-- Uttar Pradesh -->
+                <div class="stamp-card" id="stamp-uttar_pradesh" onclick="selectDestination('uttar_pradesh')"
+                    title="Explore Uttar Pradesh">
+                    <div class="stamp-frame">
+                        <img src="/static/images/uttar_pradesh.jpeg" alt="Uttar Pradesh Stamp" class="stamp-img" />
+                    </div>
+                </div>
+
+                <!-- Gujarat -->
+                <div class="stamp-card" id="stamp-gujarat" onclick="selectDestination('gujarat')"
+                    title="Explore Gujarat">
+                    <div class="stamp-frame">
+                        <img src="/static/images/gujarat.jpeg" alt="Gujarat Stamp" class="stamp-img" />
+                    </div>
+                </div>
+
+                <!-- Goa -->
+                <div class="stamp-card" id="stamp-goa" onclick="selectDestination('goa')" title="Explore Goa">
+                    <div class="stamp-frame">
+                        <img src="/static/images/goa.jpeg" alt="Goa Stamp" class="stamp-img" />
+                    </div>
+                </div>
+
+                <!-- Bangalore -->
+                <div class="stamp-card" id="stamp-bangalore" onclick="selectDestination('bangalore')"
+                    title="Explore Bangalore">
+                    <div class="stamp-frame">
+                        <img src="/static/images/bangalore.jpeg" alt="Bangalore Stamp" class="stamp-img" />
+                    </div>
+                </div>
+
+                <!-- Mumbai -->
+                <div class="stamp-card" id="stamp-mumbai" onclick="selectDestination('mumbai')" title="Explore Mumbai">
+                    <div class="stamp-frame">
+                        <img src="/static/images/mumbai.jpeg" alt="Mumbai Stamp" class="stamp-img" />
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Interactive Workspace Panel -->
+        <section id="workspace-panel" class="workspace-card theme-default">
+
+            <!-- Destination Meta Header (Visible when a state is active) -->
+            <div id="dest-meta-header" class="dest-meta-header hidden">
+                <div class="dest-meta-title-group">
+                    <span class="dest-meta-icon" id="dest-meta-icon">
+                        <i data-lucide="map-pin" class="meta-icon-svg"></i>
+                    </span>
+                    <div>
+                        <h3 id="dest-meta-title">Goa Travel Guide</h3>
+                        <p id="dest-meta-summary">Sun-kissed beaches, clifftop forts, UNESCO churches, spicy seafood, and Susegad culture.</p>
+                    </div>
+                </div>
+                <div class="dest-meta-pills">
+                    <span id="dest-meta-budget" class="meta-pill"><i data-lucide="wallet" class="icon-xs"></i> ₹1,200 – ₹12,000/day</span>
+                    <span id="dest-meta-transport" class="meta-pill"><i data-lucide="navigation" class="icon-xs"></i> Scooters & Ferries</span>
+                    <button class="btn btn-sm btn-itinerary btn-icon-gap" onclick="generateQuickItinerary()">
+                        <i data-lucide="map" class="icon-xs"></i> Generate 3-Day Itinerary
+                    </button>
+                    <button class="btn btn-sm btn-clear btn-icon-gap" onclick="clearChatHistory()" title="Clear conversation memory">
+                        <i data-lucide="trash-2" class="icon-xs"></i> Clear Chat
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Conversation Thread (Multi-turn Memory) -->
+            <div id="chat-thread" class="chat-thread">
+                <!-- Welcome/Initial Assistant Message -->
+                <div class="chat-msg assistant-msg">
+                    <div class="msg-avatar">
+                        <i data-lucide="sparkles" class="avatar-icon"></i>
+                    </div>
+                    <div class="msg-body">
+                        <div class="msg-header">
+                            <span class="msg-author">AI Travel Guide</span>
+                            <span class="msg-badge">5 Core Destinations</span>
+                        </div>
+                        <div class="msg-content markdown-body">
+                            <p>Hello! I am your AI Travel Assistant, verified across <strong>Goa</strong>, <strong>Mumbai</strong>, <strong>Bangalore</strong>, <strong>Gujarat</strong>, and <strong>Uttar Pradesh</strong>.</p>
+                            <p>Ask me anything about temples, heritage, monuments, beaches, local food, or itineraries. I remember our conversation, so feel free to ask follow-up questions!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Input Row -->
+            <div class="query-box-group">
+                <div class="search-bar">
+                    <input type="text" id="user-query-input"
+                        placeholder="e.g., What are the best street food spots and local transport options in Mumbai?" />
+                    <button id="btn-submit-query" class="btn btn-primary btn-icon-gap" onclick="submitQuery()">
+                        <span>Ask Guide</span> <i data-lucide="send" class="icon-sm"></i>
+                    </button>
+                    <button id="btn-clear-chat" class="btn btn-secondary btn-clear-icon btn-icon-gap" onclick="clearChatHistory()" title="Clear Chat History">
+                        <i data-lucide="trash-2" class="icon-sm"></i>
+                    </button>
+                </div>
+
+                <!-- Quick Suggestions Row -->
+                <div class="quick-suggestions-wrapper">
+                    <div id="quick-chips-container" class="chips-container">
+                        <!-- Populated dynamically based on destination -->
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Global Loading Indicator -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner-box">
+            <div class="spinner"></div>
+            <p id="loading-message">Retrieving grounded travel knowledge and generating response with Gemini...</p>
+        </div>
+    </div>
+
+    <footer class="app-footer">
+        <p>Travel RAG Assistant • Powered by Google Gemini & Chroma Vector DB</p>
+    </footer>
+
+    <script src="/static/app.js?v=10.0"></script>
+</body>
+
+</html>
