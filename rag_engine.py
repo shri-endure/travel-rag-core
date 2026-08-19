@@ -214,9 +214,9 @@ class TravelRAGEngine:
         search_filter = None
         if destination_filter and destination_filter.lower() not in ["all", "none", ""]:
             search_filter = {"destination": destination_filter.title()}
-            default_k = 4
-        else:
             default_k = 6
+        else:
+            default_k = 8
 
         actual_k = k if k is not None else default_k
 
@@ -308,13 +308,13 @@ class TravelRAGEngine:
         destination_filter: Optional[str] = None,
         chat_history: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
-        """Strict RAG pipeline grounded in ChromaDB Knowledge Base with conversational memory, exact photo matching, and citations."""
+        """Hybrid Grounded RAG: Anchored in ChromaDB Knowledge Base + Enhanced with Gemini Travel Intelligence for complete, intact responses."""
         
         # 1. Check for outside destination query
         if self._is_outside_destination(query):
             msg = (
                 "I specialize exclusively in our **5 verified core destinations**: **Goa**, **Mumbai**, **Bangalore**, **Gujarat**, and **Uttar Pradesh**.\n\n"
-                "To ensure 100% accurate, verified, and grounded advice, I do not provide travel guides for other states or international regions. "
+                "To ensure accurate, verified, and grounded advice, I do not provide travel guides for other states or international regions. "
                 "Please feel free to ask anything about top attractions, temples, food, culture, itineraries, or transport for our 5 core destinations!"
             )
             return {
@@ -333,14 +333,14 @@ class TravelRAGEngine:
         for i, doc in enumerate(retrieved_docs, 1):
             dest = doc.metadata.get("destination", "Unknown")
             src = doc.metadata.get("source", "Unknown")
-            context_parts.append(f"[Source {i} - Destination: {dest} ({src})]:\n{doc.page_content}")
+            context_parts.append(f"[Destination: {dest} | File: {src}]:\n{doc.page_content}")
             
             src_key = (dest, src)
             if src_key not in seen_sources:
                 sources.append({"destination": dest, "source": src, "snippet": doc.page_content[:120] + "..."})
                 seen_sources.add(src_key)
 
-        context_str = "\n\n".join(context_parts) if context_parts else "No matching verified documents found in database."
+        context_str = "\n\n".join(context_parts) if context_parts else "No specific verified documents found in database."
 
         # 3. Format conversational chat history
         history_text = ""
@@ -351,29 +351,29 @@ class TravelRAGEngine:
                 history_lines.append(f"{role}: {item.get('content', '')}")
             history_text = "\n".join(history_lines)
 
-        # 4. Strict Grounded RAG Prompt Template
+        # 4. Hybrid Augmented Prompt Template
         system_instruction = (
-            "You are an expert, user-friendly AI Travel Guide assistant specialized strictly in 5 core regions: Goa, Mumbai, Bangalore, Gujarat, and Uttar Pradesh.\n"
-            "STRICT RULES:\n"
-            "1. Ground your answer ONLY in the provided verified context from the internal travel knowledge base.\n"
-            "2. If previous conversation history is provided, maintain natural continuity and answer follow-up questions seamlessly.\n"
-            "3. If the answer to a question or specific detail is not present in the verified context, state clearly: 'Information on this specific detail is not available in our verified travel records.' Do not guess, speculate, or hallucinate.\n"
-            "4. Organize your response with clear bold headings, bullet points, and practical advice.\n"
-            "5. Write in natural, engaging travel guide prose. Do NOT write raw bracketed citations like '[Source 1]' or append a 'Source Citations:' section at the end, as sources are automatically handled and presented by the UI."
+            "You are an expert, comprehensive, and friendly AI Travel Guide assistant specializing in 5 core regions: Goa, Mumbai, Bangalore, Gujarat, and Uttar Pradesh.\n\n"
+            "GUIDELINES FOR INTACT & COMPREHENSIVE RESPONSES:\n"
+            "1. PRIMARY KNOWLEDGE BASE GROUNDING: Anchor your answers firmly in the verified context provided below (including specific attractions, local dishes, transport modes, routes, and regional advice).\n"
+            "2. INTELLIGENT TRAVEL SYNTHESIS: Use your travel expertise to provide complete, thorough, engaging, and practical responses. Seamlessly explain descriptions, highlight cultural significance, suggest optimal visit order, and share helpful traveler tips (such as best times of day, what to expect, and practical etiquette).\n"
+            "3. MULTI-TURN CONTINUITY: If conversation history is present, maintain context naturally to answer follow-up queries cohesively.\n"
+            "4. SCOPE INTEGRITY: Stay strictly focused on the 5 core destinations. Do not invent non-existent places or false pricing.\n"
+            "5. STRUCTURE: Use clear bold headings, organized bullet points, and an inviting tone. Do NOT include raw bracketed citations like '[Source 1]' or append 'Source Citations:' lists, as sources are rendered by the system UI."
         )
 
         full_prompt = f"""{system_instruction}
 
---- PREVIOUS CONVERSATION MEMORY ---
+--- PRIOR CONVERSATION CONTEXT ---
 {history_text if history_text else "No prior conversation."}
 
---- VERIFIED INTERNAL KNOWLEDGE BASE ---
+--- VERIFIED REGIONAL KNOWLEDGE BASE ---
 {context_str}
 
---- CURRENT TRAVEL QUESTION ---
+--- TRAVELER'S QUESTION ---
 {query}
 
---- GROUNDED TRAVEL ADVICE ---"""
+--- COMPLETE & DETAILED TRAVEL GUIDE RESPONSE ---"""
 
         llm = self._init_llm()
         if not llm:
