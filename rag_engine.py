@@ -10,24 +10,26 @@ from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 # ---------------------------------------------------------------------------
-# Global Embedding Model Singleton (Speeds up initializations & eliminates lag)
+# Global Embedding Model Singleton (Ultra-lightweight API-based embeddings)
 # ---------------------------------------------------------------------------
 _GLOBAL_EMBEDDING_CACHE = None
 
 def get_shared_embeddings():
     global _GLOBAL_EMBEDDING_CACHE
     if _GLOBAL_EMBEDDING_CACHE is None:
-        print("[Embedding Cache] Loading sentence-transformers model once...")
-        _GLOBAL_EMBEDDING_CACHE = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        api_key = os.getenv("GOOGLE_API_KEY")
+        print("[Embedding Cache] Initializing Google Gemini Embeddings (gemini-embedding-001)...")
+        _GLOBAL_EMBEDDING_CACHE = GoogleGenerativeAIEmbeddings(
+            model="gemini-embedding-001",
+            google_api_key=api_key
         )
     return _GLOBAL_EMBEDDING_CACHE
+
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +78,7 @@ class TravelRAGEngine:
         return None
 
 
-    def load_and_chunk_documents(self, chunk_size: int = 700, chunk_overlap: int = 100) -> List[Document]:
+    def load_and_chunk_documents(self, chunk_size: int = 1200, chunk_overlap: int = 150) -> List[Document]:
         """Reads all .txt files in data/ and splits them into LangChain Document chunks."""
         data_path = Path(self.data_directory)
         txt_files = list(data_path.glob("*.txt"))
@@ -86,6 +88,7 @@ class TravelRAGEngine:
             chunk_overlap=chunk_overlap,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
+
         
         all_chunks = []
         for file_path in txt_files:
@@ -126,25 +129,30 @@ class TravelRAGEngine:
                 if count > 0:
                     return self.vector_store
             else:
+                import shutil
                 try:
-                    old_store = Chroma(
-                        collection_name="travel_knowledge",
-                        embedding_function=self.embeddings,
-                        persist_directory=self.persist_directory
-                    )
-                    old_store.delete_collection()
+                    shutil.rmtree(self.persist_directory, ignore_errors=True)
                 except Exception:
                     pass
 
-        # Otherwise create fresh index
+        # Otherwise create fresh index in rate-limit-safe batches
+        import time
         chunks = self.load_and_chunk_documents()
-        self.vector_store = Chroma.from_documents(
-            documents=chunks,
-            embedding=self.embeddings,
+        self.vector_store = Chroma(
             collection_name="travel_knowledge",
+            embedding_function=self.embeddings,
             persist_directory=self.persist_directory
         )
+        
+        batch_size = 25
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            self.vector_store.add_documents(batch)
+            if i + batch_size < len(chunks):
+                time.sleep(2)
+
         return self.vector_store
+
 
     def ingest_documents(self, force_reload: bool = True) -> Dict[str, Any]:
         """Ingests raw text files from data/ into ChromaDB."""

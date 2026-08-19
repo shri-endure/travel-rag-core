@@ -147,8 +147,9 @@ def health_check():
     return {
         "status": "healthy",
         "total_vectors_in_db": count,
-        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2"
+        "embedding_model": "google/gemini-embedding-001"
     }
+
 
 
 @app.post("/query", response_model=QueryResponse, tags=["RAG Pipeline"])

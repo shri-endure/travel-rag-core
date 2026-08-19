@@ -12,6 +12,4 @@ __pycache__/
 
 vector_db/
 chroma/
-*.faiss
-
-chroma_storage/
+*.faiss
