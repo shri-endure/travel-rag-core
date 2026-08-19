@@ -21,32 +21,40 @@
     <!-- Header Bar -->
     <header class="app-header">
         <div class="header-container">
-            <div class="logo" onclick="resetToAllDestinations()">
+            <div class="logo" onclick="resetToFreshPage()" title="Reset to fresh home page">
                 <div class="logo-icon-box">
                     <i data-lucide="compass" class="logo-icon-svg"></i>
                 </div>
                 <div>
                     <h1>Travel RAG Assistant</h1>
-                    <p class="subtitle">AI Knowledge Base & Itinerary Planner</p>
+                    <p class="subtitle">AI Knowledge Base & Destination Guide</p>
                 </div>
             </div>
             <div class="header-actions">
                 <div id="status-badge" class="badge ready">
                     <span class="dot"></span> <span id="status-text">Gemini & Chroma Ready</span>
                 </div>
-                <button id="btn-ingest" class="btn btn-secondary btn-icon-gap" onclick="triggerIngestion()">
-                    <i data-lucide="refresh-cw" class="icon-sm"></i> Re-index Knowledge Base
+                <button type="button" id="btn-fresh-page" class="btn btn-secondary btn-icon-gap" onclick="resetToFreshPage()" title="Reset conversation and start fresh">
+                    <i data-lucide="rotate-ccw" class="icon-sm"></i> Fresh Page
+                </button>
+                <button type="button" id="btn-ingest" class="btn btn-secondary btn-icon-gap" onclick="triggerIngestion()" title="Re-sync knowledge base vectors">
+                    <i data-lucide="refresh-cw" class="icon-sm"></i> Re-index DB
+                </button>
+                <button type="button" id="btn-app-info" class="btn btn-icon-round" onclick="openAppInfoModal()" title="About Travel RAG Assistant">
+                    <i data-lucide="info" class="icon-sm"></i>
                 </button>
             </div>
         </div>
     </header>
+
+
 
     <!-- Main Container -->
     <main class="main-container">
 
         <!-- Top Destination Navigation & Breadcrumb Bar (Visible when destination is selected) -->
         <div id="dest-top-bar" class="dest-top-bar hidden">
-            <button class="btn btn-back btn-icon-gap" onclick="resetToAllDestinations()">
+            <button type="button" class="btn btn-back btn-icon-gap" onclick="resetToAllDestinations()">
                 <i data-lucide="arrow-left" class="icon-sm"></i> Back to All Destinations
             </button>
             <div class="dest-breadcrumb">
@@ -121,16 +129,6 @@
                         <p id="dest-meta-summary">Sun-kissed beaches, clifftop forts, UNESCO churches, spicy seafood, and Susegad culture.</p>
                     </div>
                 </div>
-                <div class="dest-meta-pills">
-                    <span id="dest-meta-budget" class="meta-pill"><i data-lucide="wallet" class="icon-xs"></i> ₹1,200 – ₹12,000/day</span>
-                    <span id="dest-meta-transport" class="meta-pill"><i data-lucide="navigation" class="icon-xs"></i> Scooters & Ferries</span>
-                    <button class="btn btn-sm btn-itinerary btn-icon-gap" onclick="generateQuickItinerary()">
-                        <i data-lucide="map" class="icon-xs"></i> Generate 3-Day Itinerary
-                    </button>
-                    <button class="btn btn-sm btn-clear btn-icon-gap" onclick="clearChatHistory()" title="Clear conversation memory">
-                        <i data-lucide="trash-2" class="icon-xs"></i> Clear Chat
-                    </button>
-                </div>
             </div>
 
             <!-- Chat Conversation Thread (Multi-turn Memory) -->
@@ -153,18 +151,39 @@
                 </div>
             </div>
 
-            <!-- Query Input Row -->
+            <!-- Query Input Row with Multimodal Image Upload -->
             <div class="query-box-group">
+                <!-- Image Preview Badge -->
+                <div id="image-preview-container" class="image-preview-container" style="display: none;">
+                    <div class="image-preview-card">
+                        <img id="image-preview-img" alt="" style="display: none;" />
+                        <span id="image-preview-name" class="image-preview-name">Landmark photo attached</span>
+                        <button type="button" class="btn-remove-image" onclick="clearSelectedImage()" title="Remove attached photo">
+                            <i data-lucide="x" class="icon-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="search-bar">
+                    <!-- Hidden File Input for Image Upload -->
+                    <input type="file" id="user-image-input" accept="image/*" style="display: none;" onchange="handleImageUpload(event)" />
+                    
+                    <button type="button" id="btn-upload-image" class="btn btn-upload-icon" onclick="triggerImagePicker()" title="Upload Landmark / Dish Image for Visual Guide">
+                        <i data-lucide="camera" class="icon-sm"></i>
+                    </button>
+                    
                     <input type="text" id="user-query-input"
-                        placeholder="e.g., What are the best street food spots and local transport options in Mumbai?" />
-                    <button id="btn-submit-query" class="btn btn-primary btn-icon-gap" onclick="submitQuery()">
+                        placeholder="Ask a question or upload a photo of a temple, beach, or landmark..." />
+                    
+                    <button type="button" id="btn-submit-query" class="btn btn-primary btn-icon-gap" onclick="submitQuery()">
                         <span>Ask Guide</span> <i data-lucide="send" class="icon-sm"></i>
                     </button>
-                    <button id="btn-clear-chat" class="btn btn-secondary btn-clear-icon btn-icon-gap" onclick="clearChatHistory()" title="Clear Chat History">
+                    
+                    <button type="button" id="btn-clear-chat" class="btn btn-secondary btn-clear-icon btn-icon-gap" onclick="clearChatHistory()" title="Clear Chat History">
                         <i data-lucide="trash-2" class="icon-sm"></i>
                     </button>
                 </div>
+
 
                 <!-- Quick Suggestions Row -->
                 <div class="quick-suggestions-wrapper">
@@ -178,6 +197,100 @@
 
     </main>
 
+    <!-- App Information Modal -->
+    <div id="info-modal-backdrop" class="modal-backdrop hidden" onclick="closeAppInfoModal(event)">
+        <div class="info-modal-card" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title-wrap">
+                    <div class="modal-logo-box">
+                        <i data-lucide="compass" class="modal-logo-icon"></i>
+                    </div>
+                    <div>
+                        <div class="modal-title-row">
+                            <h3>Travel RAG Assistant</h3>
+                            <span class="app-version-badge">v2.5 Pro</span>
+                        </div>
+                        <p class="modal-subtitle">AI Knowledge Base & Destination Guide</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-modal" onclick="closeAppInfoModal()" title="Close dialog">
+                    <i data-lucide="x" class="icon-sm"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- App Intro Banner -->
+                <div class="about-app-banner">
+                    <p><strong>Travel RAG Assistant</strong> is an intelligent, multi-regional travel guide designed for exploring India's premier cultural destinations. It combines local knowledge bases with real-time web search and vision analysis for accurate travel guidance.</p>
+                </div>
+
+                <!-- Feature Grid -->
+                <h4 class="modal-section-heading"><i data-lucide="sparkles" class="icon-xs"></i> Key Capabilities</h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-item-icon"><i data-lucide="database" class="icon-sm"></i></div>
+                        <div>
+                            <h4>ChromaDB Vector Retrieval</h4>
+                            <p>111 indexed semantic chunks with local Sentence-Transformers embeddings (<code>all-MiniLM-L6-v2</code>) for instant, grounded retrieval.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-icon"><i data-lucide="globe" class="icon-sm"></i></div>
+                        <div>
+                            <h4>Live Web Augmentation</h4>
+                            <p>Tavily Search API fetches real-time festival schedules, live weather, and fresh travel advisories directly from the web.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-icon"><i data-lucide="camera" class="icon-sm"></i></div>
+                        <div>
+                            <h4>Multimodal Vision Guide</h4>
+                            <p>Upload monument or dish photos to automatically identify landmarks and retrieve verified cultural facts.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-icon"><i data-lucide="languages" class="icon-sm"></i></div>
+                        <div>
+                            <h4>Native Vernacular & Tooltips</h4>
+                            <p>Hover over local dialect words (e.g. <em>Kem Cho</em>, <em>Susegad</em>, <em>Aamchi Mumbai</em>) to see definitions without cluttered line breaks.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-icon"><i data-lucide="message-square" class="icon-sm"></i></div>
+                        <div>
+                            <h4>Multi-Turn Memory</h4>
+                            <p>Maintains conversational context across your query session for natural follow-up questions and customized trip plans.</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-item-icon"><i data-lucide="shield-check" class="icon-sm"></i></div>
+                        <div>
+                            <h4>Verified Source Grounding</h4>
+                            <p>Every response is backed by source citations, eliminating AI hallucinations and providing accurate travel tips.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tech Specs & Coverage -->
+                <h4 class="modal-section-heading" style="margin-top: 1.25rem;"><i data-lucide="cpu" class="icon-xs"></i> System Specs</h4>
+                <div class="specs-pill-container">
+                    <span class="spec-pill"><i data-lucide="bot" class="icon-xs"></i> Model: Gemini 2.5 Flash</span>
+                    <span class="spec-pill"><i data-lucide="server" class="icon-xs"></i> Backend: FastAPI (Python)</span>
+                    <span class="spec-pill"><i data-lucide="layers" class="icon-xs"></i> Embeddings: all-MiniLM-L6-v2</span>
+                    <span class="spec-pill"><i data-lucide="map-pin" class="icon-xs"></i> 5 Regions: Goa • Mumbai • Bangalore • Gujarat • UP</span>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="modal-footer-status">
+                    <span class="dot-pulse"></span> <span>System Status: Healthy • Ready</span>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="closeAppInfoModal()">Got it</button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Global Loading Indicator -->
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="spinner-box">
@@ -190,7 +303,7 @@
         <p>Travel RAG Assistant • Powered by Google Gemini & Chroma Vector DB</p>
     </footer>
 
-    <script src="/static/app.js?v=10.0"></script>
+    <script src="/static/app.js?v=11.0"></script>
 </body>
 
 </html>

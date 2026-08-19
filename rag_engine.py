@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -41,70 +42,11 @@ NON_CORE_KEYWORDS = [
     "sikkim", "paris", "london", "switzerland", "bali", "dubai", "thailand", "singapore"
 ]
 
-# (Title, URL, Source Citation, Category)
-CURATED_PHOTOS: Dict[str, Tuple[str, str, str, str]] = {
-    # --- TEMPLES & SPIRITUAL LANDMARKS ---
-    "somnath": ("Somnath Jyotirlinga Temple, Gujarat", "https://images.unsplash.com/photo-1609766418204-94aae0ecfddc?w=800", "Gujarat Tourism / Unsplash", "temple"),
-    "dwarka": ("Dwarkadhish Temple, Gujarat", "https://images.unsplash.com/photo-1609766418204-94aae0ecfddc?w=800", "Gujarat Tourism / Unsplash", "temple"),
-    "dwarkadhish": ("Dwarkadhish Temple, Gujarat", "https://images.unsplash.com/photo-1609766418204-94aae0ecfddc?w=800", "Gujarat Tourism / Unsplash", "temple"),
-    "siddhivinayak": ("Shree Siddhivinayak Temple, Mumbai", "https://images.unsplash.com/photo-1548013146-72479768bada?w=800", "Maharashtra Tourism / Unsplash", "temple"),
-    "haji ali": ("Haji Ali Dargah, Mumbai", "https://images.unsplash.com/photo-1566552881560-0be86c532107?w=800", "Incredible India / Unsplash", "temple"),
-    "kashi": ("Kashi Vishwanath & Ganga Ghats, Varanasi", "https://images.unsplash.com/photo-1561359313-0639aad49ca6?w=800", "UP Tourism / Unsplash", "temple"),
-    "varanasi": ("Varanasi Ganga Ghats & Evening Aarti", "https://images.unsplash.com/photo-1561359313-0639aad49ca6?w=800", "UP Tourism / Unsplash", "temple"),
-    "ghat": ("Varanasi Dashashwamedh Ghat", "https://images.unsplash.com/photo-1561359313-0639aad49ca6?w=800", "UP Tourism / Unsplash", "temple"),
-    "aarti": ("Maha Ganga Aarti at Dashashwamedh Ghat", "https://images.unsplash.com/photo-1561359313-0639aad49ca6?w=800", "UP Tourism / Unsplash", "temple"),
-    "ayodhya": ("Shri Ram Janmabhoomi Temple, Ayodhya", "https://images.unsplash.com/photo-1548013146-72479768bada?w=800", "UP Tourism / Unsplash", "temple"),
-    "ram mandir": ("Shri Ram Janmabhoomi Temple, Ayodhya", "https://images.unsplash.com/photo-1548013146-72479768bada?w=800", "UP Tourism / Unsplash", "temple"),
-    "bom jesus": ("Basilica of Bom Jesus, Old Goa", "https://images.unsplash.com/photo-1614082242765-7c98ca0f3df3?w=800", "Goa Tourism / Unsplash", "temple"),
-    "old goa": ("Basilica of Bom Jesus & Se Cathedral", "https://images.unsplash.com/photo-1614082242765-7c98ca0f3df3?w=800", "Goa Tourism / Unsplash", "temple"),
-    "sun temple": ("Sun Temple, Modhera", "https://images.unsplash.com/photo-1609137144820-21a4f0093848?w=800", "Gujarat Tourism / Unsplash", "temple"),
-    "iskcon": ("ISKCON Temple, Bangalore", "https://images.unsplash.com/photo-1596176530529-78163a4f7af2?w=800", "Karnataka Tourism / Unsplash", "temple"),
-    "mathura": ("Shri Krishna Janmabhoomi, Mathura", "https://images.unsplash.com/photo-1548013146-72479768bada?w=800", "UP Tourism / Unsplash", "temple"),
-    "vrindavan": ("Banke Bihari & Prem Mandir, Vrindavan", "https://images.unsplash.com/photo-1548013146-72479768bada?w=800", "UP Tourism / Unsplash", "temple"),
-
-    # --- MONUMENTS & HERITAGE ---
-    "taj mahal": ("The Taj Mahal, Agra", "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800", "UP Tourism / Unsplash", "monument"),
-    "agra": ("The Taj Mahal, Agra", "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800", "UP Tourism / Unsplash", "monument"),
-    "gateway of india": ("Gateway of India, Mumbai", "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=800", "Maharashtra Tourism / Unsplash", "monument"),
-    "marine drive": ("Marine Drive Promenade, Mumbai", "https://images.unsplash.com/photo-1566552881560-0be86c532107?w=800", "Maharashtra Tourism / Unsplash", "monument"),
-    "statue of unity": ("Statue of Unity, Kevadia", "https://images.unsplash.com/photo-1609137144820-21a4f0093848?w=800", "Gujarat Tourism / Unsplash", "monument"),
-    "bangalore palace": ("Bangalore Palace", "https://images.unsplash.com/photo-1596176530529-78163a4f7af2?w=800", "Karnataka Tourism / Unsplash", "monument"),
-    "lalbagh": ("Lalbagh Botanical Garden Glass House", "https://images.unsplash.com/photo-1580655653885-65763b2597d0?w=800", "Karnataka Tourism / Unsplash", "nature"),
-    "cubbon": ("Cubbon Park Trails, Bangalore", "https://images.unsplash.com/photo-1593693397690-362cb9666fc2?w=800", "Karnataka Tourism / Unsplash", "nature"),
-    "elephanta": ("Elephanta Caves, Mumbai", "https://images.unsplash.com/photo-1605649487212-47bdab064df7?w=800", "Maharashtra Tourism / Unsplash", "monument"),
-    "csmt": ("CSMT World Heritage Terminus, Mumbai", "https://images.unsplash.com/photo-1567157577867-05ccb1388e66?w=800", "Maharashtra Tourism / Unsplash", "monument"),
-    "rann of kutch": ("White Desert, Rann of Kutch", "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800", "Gujarat Tourism / Unsplash", "nature"),
-    "white rann": ("White Desert, Rann of Kutch", "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800", "Gujarat Tourism / Unsplash", "nature"),
-    "gir": ("Asiatic Lions in Gir National Park", "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=800", "Gujarat Forest Dept / Unsplash", "nature"),
-    "lion": ("Asiatic Lion in Gir Forest", "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=800", "Gujarat Forest Dept / Unsplash", "nature"),
-    "dudhsagar": ("Dudhsagar Waterfalls, Goa", "https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=800", "Goa Tourism / Unsplash", "nature"),
-    "nandi hills": ("Nandi Hills Sunrise Point", "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=800", "Karnataka Tourism / Unsplash", "nature"),
-    "fontainhas": ("Fontainhas Latin Quarter, Panaji", "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?w=800", "Goa Tourism / Unsplash", "monument"),
-    "lucknow": ("Rumi Darwaza & Bara Imambara, Lucknow", "https://images.unsplash.com/photo-1599661046827-dacff0c0f09a?w=800", "UP Tourism / Unsplash", "monument"),
-
-    # --- BEACHES (Only matched when beach or coastal water sport keywords occur) ---
-    "baga": ("Baga Beach, North Goa", "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800", "Goa Tourism / Unsplash", "beach"),
-    "calangute": ("Calangute Beach, North Goa", "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=800", "Goa Tourism / Unsplash", "beach"),
-    "palolem": ("Palolem Beach, South Goa", "https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=800", "Goa Tourism / Unsplash", "beach"),
-    "anjuna": ("Anjuna Beach & Flea Market, Goa", "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800", "Goa Tourism / Unsplash", "beach"),
-
-    # --- LOCAL FOOD & SPECIALTIES ---
-    "vada pav": ("Mumbai Vada Pav", "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800", "Mumbai Food Trails / Unsplash", "food"),
-    "pav bhaji": ("Mumbai Pav Bhaji", "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=800", "Mumbai Food Trails / Unsplash", "food"),
-    "fish curry": ("Goan Fish Curry Thali", "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=800", "Goa Culinary / Unsplash", "food"),
-    "seafood": ("Goan Seafood Specialties", "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=800", "Goa Culinary / Unsplash", "food"),
-    "benne dosa": ("Crispy Butter Benne Dosa", "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=800", "Bangalore Food Guide / Unsplash", "food"),
-    "dosa": ("Crispy South Indian Dosa", "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=800", "Bangalore Food Guide / Unsplash", "food"),
-    "filter coffee": ("Traditional South Indian Filter Coffee", "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=800", "Bangalore Coffee Trails / Unsplash", "food"),
-    "thali": ("Grand Gujarati Vegetarian Thali", "https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=800", "Gujarat Culinary / Unsplash", "food"),
-    "kebab": ("Lucknow Tunday Kebabs & Awadhi Flavors", "https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=800", "Awadhi Cuisine / Unsplash", "food"),
-    "biryani": ("Lucknowi Awadhi Dum Biryani", "https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=800", "Awadhi Cuisine / Unsplash", "food")
-}
-
 
 class TravelRAGEngine:
     def __init__(self, persist_directory: Optional[str] = None):
         base_dir = Path(__file__).resolve().parent
+
         self.data_directory = str(base_dir / "data")
         self.persist_directory = persist_directory or str(base_dir / "chroma_storage")
         
@@ -112,14 +54,17 @@ class TravelRAGEngine:
         self.embeddings = get_shared_embeddings()
         self.vector_store: Optional[Chroma] = None
 
-    def _init_llm(self):
-        """Initializes Google Gemini Chat Model with resilient model fallbacks."""
+    def _init_llm(self, model_name: Optional[str] = None):
+        """Initializes Google Gemini Chat Model with resilient high-quota model fallbacks."""
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             print("[Warning] GOOGLE_API_KEY is not set in .env")
             return None
         
-        for model in ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.6-flash", "gemini-2.5-flash"]:
+        models_to_try = [model_name] if model_name else ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-pro"]
+        for model in models_to_try:
+            if not model:
+                continue
             try:
                 return ChatGoogleGenerativeAI(
                     model=model,
@@ -129,6 +74,7 @@ class TravelRAGEngine:
             except Exception:
                 continue
         return None
+
 
     def load_and_chunk_documents(self, chunk_size: int = 700, chunk_overlap: int = 100) -> List[Document]:
         """Reads all .txt files in data/ and splits them into LangChain Document chunks."""
@@ -302,26 +248,63 @@ class TravelRAGEngine:
 
         return matched
 
-    def generate_answer(
+    def _search_tavily(self, query: str, max_results: int = 3, include_images: bool = True) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+        """Searches Tavily SERP API for real-time web results and authentic images if TAVILY_API_KEY is configured."""
+        api_key = os.getenv("TAVILY_API_KEY")
+        if not api_key or not api_key.strip():
+            return [], []
+        
+        try:
+            import requests
+            response = requests.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": api_key.strip(),
+                    "query": query,
+                    "search_depth": "basic",
+                    "max_results": max_results,
+                    "include_images": include_images,
+                    "include_answer": False
+                },
+                timeout=6
+            )
+            if response.status_code == 200:
+                data = response.json()
+                results = []
+                for item in data.get("results", []):
+                    results.append({
+                        "title": item.get("title", "Web Result"),
+                        "url": item.get("url", ""),
+                        "content": item.get("content", "")
+                    })
+                return results, []
+            else:
+                print(f"[Tavily Notice] Status {response.status_code}: {response.text[:100]}")
+                return [], []
+
+        except Exception as e:
+            print(f"[Tavily Warning] Could not reach Tavily API: {e}")
+            return [], []
+
+    def _build_rag_prompt_and_sources(
         self,
         query: str,
         destination_filter: Optional[str] = None,
-        chat_history: Optional[List[Dict[str, str]]] = None
-    ) -> Dict[str, Any]:
-        """Hybrid Grounded RAG: Anchored in ChromaDB Knowledge Base + Enhanced with Gemini Travel Intelligence for complete, intact responses."""
-        
-        # 1. Check for outside destination query
-        if self._is_outside_destination(query):
+        chat_history: Optional[List[Dict[str, str]]] = None,
+        image_data: Optional[str] = None
+    ) -> Tuple[Optional[str], List[Dict[str, Any]], Optional[str]]:
+        """Prepares retrieved ChromaDB context, live Tavily web search, and structured prompt."""
+        # 1. Check for outside destination query & Live Search fallback
+        is_outside = self._is_outside_destination(query)
+        web_results, _ = self._search_tavily(query, max_results=3, include_images=False)
+
+        if is_outside and not web_results and not image_data:
             msg = (
                 "I specialize exclusively in our **5 verified core destinations**: **Goa**, **Mumbai**, **Bangalore**, **Gujarat**, and **Uttar Pradesh**.\n\n"
                 "To ensure accurate, verified, and grounded advice, I do not provide travel guides for other states or international regions. "
-                "Please feel free to ask anything about top attractions, temples, food, culture, itineraries, or transport for our 5 core destinations!"
+                "Please feel free to ask anything about top attractions, hidden beaches, temples, festivals, food, culture, itineraries, or transport for our 5 core destinations!"
             )
-            return {
-                "answer": msg,
-                "sources": [],
-                "images": []
-            }
+            return None, [], msg
 
         # 2. Retrieve relevant chunks from ChromaDB vector database
         retrieved_docs = self.retrieve(query, destination_filter=destination_filter)
@@ -337,12 +320,25 @@ class TravelRAGEngine:
             
             src_key = (dest, src)
             if src_key not in seen_sources:
-                sources.append({"destination": dest, "source": src, "snippet": doc.page_content[:120] + "..."})
+                sources.append({"destination": dest, "source": src, "snippet": doc.page_content[:120] + "...", "url": None})
                 seen_sources.add(src_key)
 
         context_str = "\n\n".join(context_parts) if context_parts else "No specific verified documents found in database."
 
-        # 3. Format conversational chat history
+        # 3. Add Live Tavily Search Context if available
+        web_parts = []
+        if web_results:
+            for r in web_results:
+                web_parts.append(f"[Web Source: {r['title']} | URL: {r['url']}]:\n{r['content']}")
+                sources.append({
+                    "destination": "Live Web Search",
+                    "source": f"Tavily: {r['title']}",
+                    "snippet": r["content"][:140] + "..." if len(r["content"]) > 140 else r["content"],
+                    "url": r["url"]
+                })
+        web_context_str = "\n\n".join(web_parts) if web_parts else "No live web search context used."
+
+        # 4. Format conversational chat history
         history_text = ""
         if chat_history and len(chat_history) > 0:
             history_lines = []
@@ -351,15 +347,25 @@ class TravelRAGEngine:
                 history_lines.append(f"{role}: {item.get('content', '')}")
             history_text = "\n".join(history_lines)
 
-        # 4. Hybrid Augmented Prompt Template
+        # 5. Prompt Directives
         system_instruction = (
-            "You are an expert, comprehensive, and friendly AI Travel Guide assistant specializing in 5 core regions: Goa, Mumbai, Bangalore, Gujarat, and Uttar Pradesh.\n\n"
-            "GUIDELINES FOR INTACT & COMPREHENSIVE RESPONSES:\n"
-            "1. PRIMARY KNOWLEDGE BASE GROUNDING: Anchor your answers firmly in the verified context provided below (including specific attractions, local dishes, transport modes, routes, and regional advice).\n"
-            "2. INTELLIGENT TRAVEL SYNTHESIS: Use your travel expertise to provide complete, thorough, engaging, and practical responses. Seamlessly explain descriptions, highlight cultural significance, suggest optimal visit order, and share helpful traveler tips (such as best times of day, what to expect, and practical etiquette).\n"
-            "3. MULTI-TURN CONTINUITY: If conversation history is present, maintain context naturally to answer follow-up queries cohesively.\n"
-            "4. SCOPE INTEGRITY: Stay strictly focused on the 5 core destinations. Do not invent non-existent places or false pricing.\n"
-            "5. STRUCTURE: Use clear bold headings, organized bullet points, and an inviting tone. Do NOT include raw bracketed citations like '[Source 1]' or append 'Source Citations:' lists, as sources are rendered by the system UI."
+            "You are an expert, warm, and engaging AI Travel Guide assistant specializing in 5 core regions: Goa, Mumbai, Bangalore, Gujarat, and Uttar Pradesh (equipped with live web search and multimodal visual analysis).\n\n"
+            "GUIDELINES FOR USER-FRIENDLY, CULTURALLY RICH & BALANCED RESPONSES:\n"
+            "1. BALANCED SYNTHESIS & SUMMARIZATION: Read and synthesize verified facts from the ChromaDB knowledge base and Live Web Search context into a conversational, well-paced travel guide.\n"
+            "2. INLINE REGIONAL VERNACULAR WITH HOVER TOOLTIPS (CRITICAL):\n"
+            "   - Naturally incorporate authentic regional terms and greetings into sentences.\n"
+            "   - NEVER put regional words or their definitions on separate lines, in brackets, or in separate definition bullet points.\n"
+            "   - ALWAYS format every regional or local dialect term directly inline using an HTML abbreviation tag with its English meaning in the title attribute: `<abbr title=\"Meaning of word\">RegionalTerm</abbr>`.\n"
+            "   - Examples:\n"
+            "     * Gujarat: `<abbr title=\"How are you? / I am great!\">Kem Cho? Majama!</abbr>`, `<abbr title=\"sweet-spicy mango pickle\">Chhundo</abbr>`, `<abbr title=\"savory snacks\">Farsan</abbr>`, `<abbr title=\"celebrate and enjoy life\">Jalsa Karo</abbr>`.\n"
+            "     * Goa: `<abbr title=\"relaxed, unhurried peaceful living\">Susegad</abbr>`, `<abbr title=\"friend / boss\">Patrao</abbr>`, `<abbr title=\"staple fish curry rice\">Xit Codi</abbr>`, `<abbr title=\"village baker\">Poder</abbr>`.\n"
+            "     * Mumbai: `<abbr title=\"Our Mumbai\">Aamchi Mumbai</abbr>`, `<abbr title=\"carefree and fearless\">Bindaas</abbr>`, `<abbr title=\"half cup strong spiced tea\">Cutting Chai</abbr>`, `<abbr title=\"clever quick-fix solution\">Jugaad</abbr>`.\n"
+            "     * Bangalore: `<abbr title=\"Please adjust a little bit\">Swalpa Adjust Maadi</abbr>`, `<abbr title=\"buddy / brother\">Maga</abbr>`, `<abbr title=\"savory breakfast snacks\">Thindi</abbr>`, `<abbr title=\"wholesome full meal\">Oota</abbr>`, `<abbr title=\"strong South Indian decoction coffee\">Filter Kaapi</abbr>`.\n"
+            "     * Uttar Pradesh: `<abbr title=\"loving spiritual greeting of Braj\">Radhe Radhe!</abbr>`, `<abbr title=\"After you, please (Awadhi courtesy)\">Pehle Aap</abbr>`, `<abbr title=\"refined elegance and hospitality\">Tehzeeb & Nazaakat</abbr>`, `<abbr title=\"magical dawn atmosphere of Varanasi\">Subah-e-Banaras</abbr>`.\n"
+            "3. DEEP TRAVEL KNOWLEDGE: Highlight both famous landmarks and lesser-known local gems (e.g., Vasco Saptah festival, Kakolem/Butterfly beaches, Khotachiwadi, Turahalli Forest, Polo Forest, Rani ki Vav, Dev Deepawali, Bateshwar).\n"
+            "4. MULTIMODAL IMAGE RECOGNITION: If the traveler has attached an image, visually identify the landmark, architectural style, deity, beach, or dish, and ground your response in its historical and regional context.\n"
+            "5. REAL-TIME AWARENESS: When Live Web Search context is provided, use it to give up-to-date festival dates, event timings, and seasonal tips.\n"
+            "6. CLEAN OUTPUT: Do NOT include raw bracketed citations like '[Source 1]' or append 'Source Citations:' lists, as sources are automatically rendered by the UI."
         )
 
         full_prompt = f"""{system_instruction}
@@ -367,13 +373,36 @@ class TravelRAGEngine:
 --- PRIOR CONVERSATION CONTEXT ---
 {history_text if history_text else "No prior conversation."}
 
---- VERIFIED REGIONAL KNOWLEDGE BASE ---
+--- VERIFIED REGIONAL KNOWLEDGE BASE (CHROMADB) ---
 {context_str}
+
+--- LIVE WEB SEARCH CONTEXT (TAVILY) ---
+{web_context_str}
 
 --- TRAVELER'S QUESTION ---
 {query}
 
---- COMPLETE & DETAILED TRAVEL GUIDE RESPONSE ---"""
+--- USER-FRIENDLY & CULTURALLY RICH TRAVEL GUIDE RESPONSE ---"""
+
+        return full_prompt, sources, None
+
+    def generate_answer(
+        self,
+        query: str,
+        destination_filter: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+        image_data: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Hybrid Grounded Multimodal RAG: ChromaDB + Live Tavily Search + Gemini Vision + Regional Vernacular."""
+        full_prompt, sources, direct_answer = self._build_rag_prompt_and_sources(
+            query=query,
+            destination_filter=destination_filter,
+            chat_history=chat_history,
+            image_data=image_data
+        )
+
+        if direct_answer:
+            return {"answer": direct_answer, "sources": sources, "images": []}
 
         llm = self._init_llm()
         if not llm:
@@ -385,7 +414,18 @@ class TravelRAGEngine:
 
         try:
             import re
-            res = llm.invoke(full_prompt)
+            if image_data:
+                img_url = image_data if image_data.startswith("data:") else f"data:image/jpeg;base64,{image_data}"
+                message = HumanMessage(
+                    content=[
+                        {"type": "text", "text": full_prompt},
+                        {"type": "image_url", "image_url": img_url}
+                    ]
+                )
+                res = llm.invoke([message])
+            else:
+                res = llm.invoke(full_prompt)
+
             if hasattr(res, "content"):
                 if isinstance(res.content, list):
                     answer_text = "".join(
@@ -397,27 +437,15 @@ class TravelRAGEngine:
             else:
                 answer_text = str(res)
             
-            # Clean up any accidental raw source dump blocks or bracketed [Source N] markers
+            # Clean up bracketed source markers
             answer_text = re.sub(r'(\n|\r\n)*(###?\s*)?(Source Citations?|Sources Used|References?):?(\n|\r\n)*((\*|-)\s*\[[^\]]+\](\n|\r\n)*)+', '', answer_text, flags=re.IGNORECASE)
             answer_text = re.sub(r'\[Source \d+[^\]]*\]', '', answer_text)
             answer_text = answer_text.strip()
 
-            # Find relevant real travel photos with title & citation
-            images = self._find_matching_images(query, answer_text, destination_filter)
-            
-            # Append image cards with title and citation
-            image_markdown = ""
-            if images:
-                image_blocks = []
-                for img in images:
-                    block = f"![{img['title']}]({img['url']})\n\n*Photo: {img['title']} | Citation: {img['citation']}*"
-                    image_blocks.append(block)
-                image_markdown = "\n\n" + "\n\n".join(image_blocks)
-            
             return {
-                "answer": answer_text + image_markdown,
+                "answer": answer_text,
                 "sources": sources,
-                "images": images
+                "images": []
             }
         except Exception as e:
             return {
@@ -426,12 +454,80 @@ class TravelRAGEngine:
                 "images": []
             }
 
+    def generate_answer_stream(
+        self,
+        query: str,
+        destination_filter: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+        image_data: Optional[str] = None
+    ):
+        """Streams real-time response tokens using Gemini streaming with immediate source metadata emission."""
+        import json
+        full_prompt, sources, direct_answer = self._build_rag_prompt_and_sources(
+            query=query,
+            destination_filter=destination_filter,
+            chat_history=chat_history,
+            image_data=image_data
+        )
+
+        # 1. First event: Emit verified sources immediately
+        yield f"data: {json.dumps({'type': 'sources', 'sources': sources, 'destination_filter': destination_filter})}\n\n"
+
+        if direct_answer:
+            yield f"data: {json.dumps({'type': 'token', 'token': direct_answer})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
+
+        llm = self._init_llm()
+        if not llm:
+            yield f"data: {json.dumps({'type': 'error', 'error': 'Gemini LLM could not be initialized.'})}\n\n"
+            return
+
+        try:
+            if image_data:
+                img_url = image_data if image_data.startswith("data:") else f"data:image/jpeg;base64,{image_data}"
+                messages = [
+                    HumanMessage(
+                        content=[
+                            {"type": "text", "text": full_prompt},
+                            {"type": "image_url", "image_url": img_url}
+                        ]
+                    )
+                ]
+                stream = llm.stream(messages)
+            else:
+                stream = llm.stream(full_prompt)
+
+            for chunk in stream:
+                token_text = ""
+                if hasattr(chunk, "content"):
+                    if isinstance(chunk.content, list):
+                        token_text = "".join(str(part.get("text", part) if isinstance(part, dict) else part) for part in chunk.content)
+                    else:
+                        token_text = str(chunk.content)
+                elif hasattr(chunk, "text"):
+                    token_text = str(chunk.text)
+                else:
+                    token_text = str(chunk)
+
+                if token_text:
+                    yield f"data: {json.dumps({'type': 'token', 'token': token_text})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+
+
 
 if __name__ == "__main__":
+    import sys
+    if sys.platform == "win32":
+        sys.stdout.reconfigure(encoding="utf-8")
     engine = TravelRAGEngine()
     
-    # Test query for temples
-    query = "What are the most sacred temples to visit in Gujarat and Uttar Pradesh?"
+    # Test query for Vasco Saptah & Hidden Beaches
+    query = "Tell me about Vasco Saptah and hidden beaches like Kakolem in Goa"
     print(f"\n--- Asking RAG Engine: '{query}' ---\n")
     result = engine.generate_answer(query)
     print("=== AI RESPONSE ===")

@@ -152,6 +152,12 @@ function selectDestination(destKey, updateHash = true) {
 
     if (updateHash) window.location.hash = destKey;
 
+    // Reset Chat Memory & Image on State Switch for a Fresh State View
+    conversationHistory = [];
+    clearSelectedImage();
+    const queryInput = document.getElementById("user-query-input");
+    if (queryInput) queryInput.value = "";
+
     // Show Top Breadcrumb Bar & Hide Hero Header Text
     document.getElementById("dest-top-bar").classList.remove("hidden");
     document.getElementById("hero-header-section").classList.add("hidden");
@@ -167,14 +173,37 @@ function selectDestination(destKey, updateHash = true) {
     panel.className = `workspace-card ${dest.themeClass}`;
 
     // Show Destination Meta Header
-    document.getElementById("dest-meta-header").classList.remove("hidden");
-    document.getElementById("dest-meta-title").innerText = dest.title;
-    document.getElementById("dest-meta-summary").innerText = dest.summary;
-    document.getElementById("dest-meta-budget").innerHTML = `<i data-lucide="wallet" class="icon-xs"></i> ${dest.budget}`;
-    document.getElementById("dest-meta-transport").innerHTML = `<i data-lucide="navigation" class="icon-xs"></i> ${dest.transport}`;
+    const metaHeader = document.getElementById("dest-meta-header");
+    if (metaHeader) metaHeader.classList.remove("hidden");
+    const metaTitle = document.getElementById("dest-meta-title");
+    if (metaTitle) metaTitle.innerText = dest.title;
+    const metaSummary = document.getElementById("dest-meta-summary");
+    if (metaSummary) metaSummary.innerText = dest.summary;
 
     // Update Input Placeholder
-    document.getElementById("user-query-input").placeholder = dest.placeholder;
+    if (queryInput) queryInput.placeholder = dest.placeholder;
+
+    // Reset Chat Thread to Fresh State-Specific Welcome
+    const thread = document.getElementById("chat-thread");
+    if (thread) {
+        thread.innerHTML = `
+            <div class="chat-msg assistant-msg">
+                <div class="msg-avatar">
+                    <i data-lucide="sparkles" class="avatar-icon"></i>
+                </div>
+                <div class="msg-body">
+                    <div class="msg-header">
+                        <span class="msg-author">AI Travel Guide</span>
+                        <span class="msg-badge">${escapeHtml(dest.name)} Guide</span>
+                    </div>
+                    <div class="msg-content markdown-body">
+                        <p>Welcome to the <strong>${escapeHtml(dest.name)}</strong> Travel Guide!</p>
+                        <p>Ask me anything about ${escapeHtml(dest.name)}'s heritage monuments, hidden beaches/forests, local food, or cultural festivals. You can also upload a photo to identify landmarks.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
 
     // Render State-Specific Quick Suggestions
     const chipsContainer = document.getElementById("quick-chips-container");
@@ -195,6 +224,15 @@ function resetToAllDestinations(updateHash = true) {
     selectedDestination = null;
     if (updateHash) window.location.hash = "home";
 
+    // Reset Chat Memory & Image for Fresh Home View
+    conversationHistory = [];
+    clearSelectedImage();
+    const queryInput = document.getElementById("user-query-input");
+    if (queryInput) {
+        queryInput.value = "";
+        queryInput.placeholder = "Ask a question or upload a photo of a temple, beach, or landmark...";
+    }
+
     // Hide Top Breadcrumb Bar & Show Hero Header Text
     document.getElementById("dest-top-bar").classList.add("hidden");
     document.getElementById("hero-header-section").classList.remove("hidden");
@@ -207,15 +245,61 @@ function resetToAllDestinations(updateHash = true) {
     panel.className = "workspace-card theme-default";
 
     // Hide Destination Meta Header
-    document.getElementById("dest-meta-header").classList.add("hidden");
+    const metaHeader = document.getElementById("dest-meta-header");
+    if (metaHeader) metaHeader.classList.add("hidden");
 
-    // Reset Input Placeholder
-    document.getElementById("user-query-input").placeholder = "e.g., What are the best street food spots and local transport options in Mumbai?";
+    // Reset Chat Thread to Fresh Initial Home Welcome
+    const thread = document.getElementById("chat-thread");
+    if (thread) {
+        thread.innerHTML = `
+            <div class="chat-msg assistant-msg">
+                <div class="msg-avatar">
+                    <i data-lucide="sparkles" class="avatar-icon"></i>
+                </div>
+                <div class="msg-body">
+                    <div class="msg-header">
+                        <span class="msg-author">AI Travel Guide</span>
+                        <span class="msg-badge">5 Core Destinations</span>
+                    </div>
+                    <div class="msg-content markdown-body">
+                        <p>Hello! I am your AI Travel Assistant, verified across <strong>Goa</strong>, <strong>Mumbai</strong>, <strong>Bangalore</strong>, <strong>Gujarat</strong>, and <strong>Uttar Pradesh</strong>.</p>
+                        <p>Ask me anything about temples, heritage, monuments, beaches, local food, or itineraries. I remember our conversation, so feel free to ask follow-up questions!</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
 
     // Render Global Suggestions
     renderGlobalSuggestions();
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+// Complete Fresh Page Reset
+function resetToFreshPage() {
+    clearChatHistory();
+    resetToAllDestinations(true);
+    const input = document.getElementById("user-query-input");
+    if (input) input.value = "";
+    window.location.hash = "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+// App Information Modal Controls
+function openAppInfoModal() {
+    const modal = document.getElementById("info-modal-backdrop");
+    if (modal) modal.classList.remove("hidden");
+    refreshIcons();
+}
+
+function closeAppInfoModal(event) {
+    if (event && event.target && event.target.id !== "info-modal-backdrop" && !event.target.closest(".btn-close-modal")) {
+        return;
+    }
+    const modal = document.getElementById("info-modal-backdrop");
+    if (modal) modal.classList.add("hidden");
+}
+
 
 // Render Global Suggestions
 function renderGlobalSuggestions() {
@@ -239,8 +323,51 @@ function executeSuggestion(query) {
     submitQuery();
 }
 
+// Global Image Upload State
+let selectedImageData = null;
+
+function triggerImagePicker() {
+    const fileInput = document.getElementById("user-image-input");
+    if (fileInput) fileInput.click();
+}
+
+function handleImageUpload(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        selectedImageData = e.target.result;
+        const container = document.getElementById("image-preview-container");
+        const previewImg = document.getElementById("image-preview-img");
+        const previewName = document.getElementById("image-preview-name");
+
+        if (previewImg) {
+            previewImg.src = selectedImageData;
+            previewImg.style.display = "block";
+        }
+        if (previewName) previewName.textContent = file.name || "Landmark photo attached";
+        if (container) container.style.display = "inline-flex";
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearSelectedImage() {
+    selectedImageData = null;
+    const container = document.getElementById("image-preview-container");
+    const previewImg = document.getElementById("image-preview-img");
+    const fileInput = document.getElementById("user-image-input");
+    if (container) container.style.display = "none";
+    if (previewImg) {
+        previewImg.src = "";
+        previewImg.style.display = "none";
+    }
+    if (fileInput) fileInput.value = "";
+}
+
+
 // Append a Message to the Chat Thread
-function appendChatMessage(role, contentHtml, sources = [], title = "") {
+function appendChatMessage(role, contentHtml, sources = [], title = "", imageAttached = null) {
     const thread = document.getElementById("chat-thread");
     if (!thread) return;
 
@@ -248,9 +375,16 @@ function appendChatMessage(role, contentHtml, sources = [], title = "") {
     msgDiv.className = `chat-msg ${role === "user" ? "user-msg" : "assistant-msg"}`;
 
     if (role === "user") {
+        let imgHtml = "";
+        if (imageAttached) {
+            imgHtml = `<div class="user-msg-image-wrap"><img src="${imageAttached}" alt="User uploaded landmark" class="user-msg-image" /></div>`;
+        }
         msgDiv.innerHTML = `
             <div class="msg-body">
-                <div class="msg-content user-bubble">${escapeHtml(contentHtml)}</div>
+                <div class="msg-content user-bubble">
+                    ${imgHtml}
+                    ${contentHtml ? `<div>${escapeHtml(contentHtml)}</div>` : ""}
+                </div>
             </div>
             <div class="msg-avatar user-avatar">
                 <i data-lucide="user" class="avatar-icon"></i>
@@ -263,9 +397,12 @@ function appendChatMessage(role, contentHtml, sources = [], title = "") {
                 <div class="msg-sources">
                     <span class="sources-label"><i data-lucide="shield-check" class="icon-xs"></i> Verified Sources:</span>
                     ${sources.map(s => {
-                        const label = typeof s === "object" ? `${s.destination} (${s.source})` : s;
-                        return `<span class="source-tag"><i data-lucide="file-text" class="icon-xs"></i> ${label}</span>`;
-                    }).join(" ")}
+                const label = typeof s === "object" ? `${s.destination} (${s.source})` : s;
+                if (typeof s === "object" && s.url) {
+                    return `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer" class="source-tag source-tag-link"><i data-lucide="external-link" class="icon-xs"></i> ${escapeHtml(label)}</a>`;
+                }
+                return `<span class="source-tag"><i data-lucide="file-text" class="icon-xs"></i> ${escapeHtml(label)}</span>`;
+            }).join(" ")}
                 </div>
             `;
         }
@@ -293,6 +430,7 @@ function appendChatMessage(role, contentHtml, sources = [], title = "") {
 // Clear Chat Memory & Reset Thread
 function clearChatHistory() {
     conversationHistory = [];
+    clearSelectedImage();
     const thread = document.getElementById("chat-thread");
     if (thread) {
         thread.innerHTML = `
@@ -306,7 +444,7 @@ function clearChatHistory() {
                         <span class="msg-badge">Memory Cleared</span>
                     </div>
                     <div class="msg-content markdown-body">
-                        <p>Conversation memory has been cleared! Ask me any travel question about <strong>Goa</strong>, <strong>Mumbai</strong>, <strong>Bangalore</strong>, <strong>Gujarat</strong>, or <strong>Uttar Pradesh</strong>.</p>
+                        <p>Conversation memory has been cleared! Ask me any travel question about <strong>Goa</strong>, <strong>Mumbai</strong>, <strong>Bangalore</strong>, <strong>Gujarat</strong>, or <strong>Uttar Pradesh</strong>, or upload a photo of a landmark.</p>
                     </div>
                 </div>
             </div>
@@ -315,58 +453,143 @@ function clearChatHistory() {
     }
 }
 
-// Submit Travel Query with Memory
+// Submit Travel Query with Real-Time Token Streaming & Memory
 async function submitQuery() {
     const input = document.getElementById("user-query-input");
-    const queryText = input.value.trim();
-    if (!queryText) return;
+    let queryText = input.value.trim();
+    const imageToSend = selectedImageData;
+
+    if (!queryText && !imageToSend) return;
+    if (!queryText && imageToSend) {
+        queryText = "What landmark, temple, or place is this, and tell me about it?";
+    }
 
     input.value = "";
     const destName = selectedDestination ? selectedDestination.apiName : undefined;
 
-    // 1. Append User Message to UI
-    appendChatMessage("user", queryText);
+    // 1. Append User Message with attached Image
+    appendChatMessage("user", queryText, [], "", imageToSend);
+    clearSelectedImage();
 
     // 2. Add to Local Memory
     const currentTurn = { role: "user", content: queryText };
     const historyToSend = [...conversationHistory];
     conversationHistory.push(currentTurn);
 
-    showLoading("Searching ChromaDB knowledge base and generating response...");
+    // 3. Create Assistant Message Element in Chat Thread for Streaming
+    const thread = document.getElementById("chat-thread");
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "chat-msg assistant-msg";
+    const titleBadge = destName ? destName : "AI Travel Guide";
+
+    msgDiv.innerHTML = `
+        <div class="msg-avatar">
+            <i data-lucide="sparkles" class="avatar-icon"></i>
+        </div>
+        <div class="msg-body">
+            <div class="msg-header">
+                <span class="msg-author">AI Travel Guide</span>
+                <span class="msg-badge">${escapeHtml(titleBadge)}</span>
+            </div>
+            <div class="msg-content markdown-body" id="streaming-content"><p class="streaming-cursor">Thinking & retrieving grounded travel knowledge...</p></div>
+            <div class="msg-sources" id="streaming-sources" style="display: none;"></div>
+        </div>
+    `;
+    thread.appendChild(msgDiv);
+    refreshIcons();
+    msgDiv.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    const contentEl = msgDiv.querySelector("#streaming-content");
+    const sourcesEl = msgDiv.querySelector("#streaming-sources");
+    if (contentEl) contentEl.removeAttribute("id");
+    if (sourcesEl) sourcesEl.removeAttribute("id");
+
+    let fullAnswer = "";
+    let receivedSources = [];
 
     try {
-        const res = await fetch("/query", {
+        const res = await fetch("/query/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 query: queryText,
                 destination: destName,
                 top_k: 4,
-                chat_history: historyToSend
+                chat_history: historyToSend,
+                image_data: imageToSend
             })
         });
-        const data = await res.json();
-        hideLoading();
 
-        if (data.error || res.status >= 400) {
-            appendChatMessage("assistant", `Error: ${data.detail || data.error || "Query failed"}`);
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            contentEl.innerHTML = `<p style="color: #dc2626;">Error: ${escapeHtml(errData.detail || "Query failed")}</p>`;
             return;
         }
 
-        // Add Assistant reply to Memory
-        conversationHistory.push({ role: "assistant", content: data.answer });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
 
-        const badgeTitle = data.destination_filter ? data.destination_filter : (selectedDestination ? selectedDestination.name : "5 Core Destinations");
-        const parsedHtml = marked.parse(data.answer);
-        appendChatMessage("assistant", parsedHtml, data.sources || [], badgeTitle);
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n\n");
+            buffer = lines.pop(); // Keep partial chunk in buffer
+
+            for (const block of lines) {
+                const trimmed = block.trim();
+                if (!trimmed.startsWith("data:")) continue;
+
+                try {
+                    const jsonStr = trimmed.replace(/^data:\s*/, "");
+                    const data = JSON.parse(jsonStr);
+
+                    if (data.type === "sources") {
+                        receivedSources = data.sources || [];
+                        if (receivedSources.length > 0) {
+                            sourcesEl.innerHTML = `
+                                <span class="sources-label"><i data-lucide="shield-check" class="icon-xs"></i> Verified Sources:</span>
+                                ${receivedSources.map(s => {
+                                const label = typeof s === "object" ? `${s.destination} (${s.source})` : s;
+                                if (typeof s === "object" && s.url) {
+                                    return `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer" class="source-tag source-tag-link"><i data-lucide="external-link" class="icon-xs"></i> ${escapeHtml(label)}</a>`;
+                                }
+                                return `<span class="source-tag"><i data-lucide="file-text" class="icon-xs"></i> ${escapeHtml(label)}</span>`;
+                            }).join(" ")}
+                            `;
+                            sourcesEl.style.display = "flex";
+                            refreshIcons();
+                        }
+                    } else if (data.type === "token") {
+                        fullAnswer += data.token;
+                        contentEl.innerHTML = marked.parse(fullAnswer);
+                        msgDiv.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                    } else if (data.type === "error") {
+                        contentEl.innerHTML += `<p style="color: #dc2626;">Error: ${escapeHtml(data.error)}</p>`;
+                    }
+                } catch (parseErr) {
+                    console.error("SSE parse error", parseErr, trimmed);
+                }
+            }
+        }
+
+        // Finalize conversation memory
+        if (fullAnswer.trim()) {
+            conversationHistory.push({ role: "assistant", content: fullAnswer.trim() });
+            contentEl.innerHTML = marked.parse(fullAnswer);
+            refreshIcons();
+        }
 
     } catch (err) {
-        hideLoading();
-        appendChatMessage("assistant", `Failed to connect to server: ${err.message}`);
+        contentEl.innerHTML = `<p style="color: #dc2626;">Network error: ${escapeHtml(err.message)}</p>`;
     }
 }
 
+
 // Generate Quick 3-Day Itinerary
+
 async function generateQuickItinerary() {
     if (!selectedDestination) return;
 

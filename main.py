@@ -3,14 +3,17 @@ import os
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+
 
 from rag_engine import TravelRAGEngine
 
 # Ensure Windows terminal handles UTF-8 clean output
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
+
 
 # ---------------------------------------------------------------------------
 # 1. Initialize FastAPI Application
@@ -70,12 +73,14 @@ class QueryRequest(BaseModel):
     destination: Optional[str] = Field(None, example="Goa", description="Optional destination filter (e.g. Goa, Mumbai, Bangalore, Gujarat, Uttar Pradesh). Leave empty/null for all destinations.")
     top_k: Optional[int] = Field(None, example=4, description="Optional number of context chunks to retrieve.")
     chat_history: Optional[List[ChatMessage]] = Field(default_factory=list, description="Prior conversation messages for multi-turn memory.")
+    image_data: Optional[str] = Field(None, description="Optional Base64 encoded image data for visual landmark analysis.")
 
 
 class SourceItem(BaseModel):
     destination: str
     source: str
     snippet: str
+    url: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -148,7 +153,7 @@ def health_check():
 
 @app.post("/query", response_model=QueryResponse, tags=["RAG Pipeline"])
 def query_travel_rag(request: QueryRequest):
-    """Executes semantic retrieval from ChromaDB and generates grounded travel advice with conversational memory."""
+    """Executes semantic retrieval from ChromaDB and generates grounded travel advice with conversational memory and vision."""
     global engine
     if engine is None:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="RAG Engine is starting up.")
@@ -156,7 +161,12 @@ def query_travel_rag(request: QueryRequest):
     try:
         dest_filter = request.destination.strip() if request.destination and request.destination.strip() else None
         history = [msg.dict() for msg in request.chat_history] if request.chat_history else []
-        res = engine.generate_answer(query=request.query, destination_filter=dest_filter, chat_history=history)
+        res = engine.generate_answer(
+            query=request.query,
+            destination_filter=dest_filter,
+            chat_history=history,
+            image_data=request.image_data
+        )
         
         return QueryResponse(
             query=request.query,
@@ -165,8 +175,31 @@ def query_travel_rag(request: QueryRequest):
             sources=res["sources"],
             images=res.get("images", [])
         )
+
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@app.post("/query/stream", tags=["RAG Pipeline"])
+def query_travel_rag_stream(request: QueryRequest):
+    """Streams real-time token generation for fast responsive user feedback."""
+    global engine
+    if engine is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="RAG Engine is starting up.")
+
+    dest_filter = request.destination.strip() if request.destination and request.destination.strip() else None
+    history = [msg.dict() for msg in request.chat_history] if request.chat_history else []
+
+    return StreamingResponse(
+        engine.generate_answer_stream(
+            query=request.query,
+            destination_filter=dest_filter,
+            chat_history=history,
+            image_data=request.image_data
+        ),
+        media_type="text/event-stream"
+    )
+
 
 
 @app.post("/itinerary", response_model=ItineraryResponse, tags=["RAG Pipeline"])
