@@ -33,15 +33,38 @@ def get_shared_embeddings():
 
 
 # ---------------------------------------------------------------------------
-# Core Constants: 5 Allowed Destinations & Curated Travel Photo Catalog
+# Core Constants: 5 Allowed Destinations & Out-of-Domain Keywords
 # ---------------------------------------------------------------------------
 CORE_DESTINATIONS = ["Goa", "Mumbai", "Bangalore", "Gujarat", "Uttar Pradesh"]
 
 NON_CORE_KEYWORDS = [
-    "kashmir", "andaman", "nicobar", "kerala", "rajasthan", "ladakh", "himachal",
-    "manali", "shimla", "rishikesh", "uttarakhand", "delhi", "punjab", "kolkata",
-    "chennai", "tamil nadu", "hyderabad", "telangana", "odisha", "assam", "meghalaya",
-    "sikkim", "paris", "london", "switzerland", "bali", "dubai", "thailand", "singapore"
+    # Indian States & UTs
+    "kashmir", "jammu", "punjab", "haryana", "himachal", "manali", "shimla", "dharamshala", "kullu", "spiti", "kasol",
+    "uttarakhand", "rishikesh", "haridwar", "dehradun", "nainital", "mussoorie", "kedarnath", "badrinath",
+    "delhi", "new delhi", "noida", "gurgaon", "gurugram", "chandigarh", "amritsar",
+    "rajasthan", "jaipur", "udaipur", "jodhpur", "jaisalmer", "pushkar", "bikaner", "mount abu",
+    "kerala", "kochi", "munnar", "alleppey", "alappuzha", "wayanad", "trivandrum", "thiruvananthapuram", "kovalam", "varkala",
+    "tamil nadu", "chennai", "madurai", "ooty", "kodaikanal", "rameswaram", "coimbatore", "kanchipuram", "pondicherry", "puducherry",
+    "andhra pradesh", "visakhapatnam", "vizag", "tirupati", "vijayawada",
+    "telangana", "hyderabad", "warangal",
+    "odisha", "orissa", "puri", "bhubaneswar", "konark",
+    "west bengal", "kolkata", "darjeeling", "siliguri", "sundarbans",
+    "bihar", "patna", "gaya", "bodhgaya", "nalanda",
+    "jharkhand", "ranchi", "jamshedpur",
+    "assam", "guwahati", "kaziranga",
+    "meghalaya", "shillong", "cherrapunji", "dawki",
+    "sikkim", "gangtok", "pelling",
+    "arunachal", "tawang", "nagaland", "kohima", "manipur", "imphal", "mizoram", "aizawl", "tripura", "agartala",
+    "madhya pradesh", "bhopal", "indore", "gwalior", "ujjain", "khajuraho", "jabalpur", "kanha",
+    "chhattisgarh", "raipur", "bastar",
+    "andaman", "nicobar", "port blair", "havelock", "lakshadweep", "ladakh", "leh",
+    # International Destinations
+    "london", "uk", "england", "paris", "france", "europe", "switzerland", "zurich", "geneva", "interlaken",
+    "italy", "rome", "venice", "milan", "florence", "usa", "america", "new york", "california", "los angeles", "san francisco",
+    "dubai", "uae", "abu dhabi", "singapore", "thailand", "bangkok", "phuket", "pattaya", "krabi", "chiang mai",
+    "bali", "indonesia", "malaysia", "kuala lumpur", "tokyo", "japan", "kyoto", "osaka",
+    "australia", "sydney", "melbourne", "canada", "toronto", "vancouver", "germany", "berlin", "munich",
+    "spain", "barcelona", "madrid", "maldives", "vietnam", "hanoi", "danang", "turkey", "istanbul", "egypt", "cairo"
 ]
 
 
@@ -187,16 +210,24 @@ class TravelRAGEngine:
 
     def _is_outside_destination(self, query: str) -> bool:
         """Checks if the query is specifically asking about a non-core destination outside our 5 states."""
+        import re
         q_lower = query.lower()
         
-        # If any of the 5 core states or known cities is explicitly mentioned, allow it
-        for core in ["goa", "mumbai", "bangalore", "bengaluru", "gujarat", "uttar pradesh", "agra", "varanasi", "lucknow", "ayodhya", "mathura", "vrindavan", "somnath", "dwarka", "ahmedabad", "kutch"]:
-            if core in q_lower:
+        # 1. If any of the 5 core states or primary cities is explicitly mentioned, allow it
+        core_keywords = [
+            "goa", "mumbai", "bangalore", "bengaluru", "gujarat", "uttar pradesh", "up",
+            "agra", "varanasi", "banaras", "kashi", "lucknow", "ayodhya", "mathura", "vrindavan",
+            "somnath", "dwarka", "ahmedabad", "kutch", "rann of kutch", "surat", "vadodara",
+            "panaji", "vasco", "calangute", "baga", "anjuna", "candolim", "palolem", "morjim", "colva",
+            "indiranagar", "koramangala", "malleshwaram", "basavanagudi", "whitefield"
+        ]
+        for core in core_keywords:
+            if re.search(r'\b' + re.escape(core) + r'\b', q_lower):
                 return False
                 
-        # If a known non-core destination is mentioned
+        # 2. If a known non-core destination is mentioned, strictly flag it as outside
         for non_core in NON_CORE_KEYWORDS:
-            if non_core in q_lower:
+            if re.search(r'\b' + re.escape(non_core) + r'\b', q_lower):
                 return True
                 
         return False
@@ -256,8 +287,8 @@ class TravelRAGEngine:
 
         return matched
 
-    def _search_tavily(self, query: str, max_results: int = 3, include_images: bool = True) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
-        """Searches Tavily SERP API for real-time web results and authentic images if TAVILY_API_KEY is configured."""
+    def _search_tavily(self, query: str, max_results: int = 3, include_images: bool = False) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+        """Searches Tavily SERP API for real-time web results if TAVILY_API_KEY is configured."""
         api_key = os.getenv("TAVILY_API_KEY")
         if not api_key or not api_key.strip():
             return [], []
@@ -302,15 +333,13 @@ class TravelRAGEngine:
         image_data: Optional[str] = None
     ) -> Tuple[Optional[str], List[Dict[str, Any]], Optional[str]]:
         """Prepares retrieved ChromaDB context, live Tavily web search, and structured prompt."""
-        # 1. Check for outside destination query & Live Search fallback
+        # 1. Strict Out-of-Domain Guardrail Check (Block unsupported states immediately)
         is_outside = self._is_outside_destination(query)
-        web_results, _ = self._search_tavily(query, max_results=3, include_images=False)
-
-        if is_outside and not web_results and not image_data:
+        if is_outside and not image_data:
             msg = (
                 "I specialize exclusively in our **5 verified core destinations**: **Goa**, **Mumbai**, **Bangalore**, **Gujarat**, and **Uttar Pradesh**.\n\n"
-                "To ensure accurate, verified, and grounded advice, I do not provide travel guides for other states or international regions. "
-                "Please feel free to ask anything about top attractions, hidden beaches, temples, festivals, food, culture, itineraries, or transport for our 5 core destinations!"
+                "To ensure accurate, verified, and culturally authentic advice, I do not provide travel guides for other states (such as Punjab, Kashmir, Kerala, Rajasthan, Delhi, etc.) or international destinations.\n\n"
+                "Please feel free to ask anything about top attractions, hidden beaches, temples, festivals, local cuisine, itineraries, or transport for our 5 core destinations!"
             )
             return None, [], msg
 
@@ -333,7 +362,8 @@ class TravelRAGEngine:
 
         context_str = "\n\n".join(context_parts) if context_parts else "No specific verified documents found in database."
 
-        # 3. Add Live Tavily Search Context if available
+        # 3. Add Live Tavily Search Context if available (Only for supported domains)
+        web_results, _ = self._search_tavily(query, max_results=3, include_images=False)
         web_parts = []
         if web_results:
             for r in web_results:
@@ -355,25 +385,28 @@ class TravelRAGEngine:
                 history_lines.append(f"{role}: {item.get('content', '')}")
             history_text = "\n".join(history_lines)
 
-        # 5. Prompt Directives
+        # 5. Prompt Directives with Verified Dialect Lexicon
         system_instruction = (
-            "You are an expert, warm, and engaging AI Travel Guide assistant specializing in 5 core regions: Goa, Mumbai, Bangalore, Gujarat, and Uttar Pradesh (equipped with live web search and multimodal visual analysis).\n\n"
-            "GUIDELINES FOR USER-FRIENDLY, CULTURALLY RICH & BALANCED RESPONSES:\n"
-            "1. BALANCED SYNTHESIS & SUMMARIZATION: Read and synthesize verified facts from the ChromaDB knowledge base and Live Web Search context into a conversational, well-paced travel guide.\n"
+            "You are an expert, warm, and engaging AI Travel Guide assistant specializing strictly in 5 core regions: "
+            "Goa, Mumbai, Bangalore, Gujarat, and Uttar Pradesh (equipped with live web search and multimodal visual analysis).\n\n"
+            "STRICT DOMAIN BOUNDARY:\n"
+            "- You MUST refuse to provide travel itineraries, hotel lists, or guides for regions outside our 5 core destinations "
+            "(e.g., Punjab, Kashmir, Kerala, Rajasthan, Delhi, London, Paris). Redirect the traveler politely to our 5 destinations.\n\n"
+            "GUIDELINES FOR USER-FRIENDLY, CULTURALLY RICH & FACTUAL RESPONSES:\n"
+            "1. BALANCED SYNTHESIS: Read and synthesize verified facts from ChromaDB knowledge base and Live Web Search context.\n"
             "2. INLINE REGIONAL VERNACULAR WITH HOVER TOOLTIPS (CRITICAL):\n"
-            "   - Naturally incorporate authentic regional terms and greetings into sentences.\n"
-            "   - NEVER put regional words or their definitions on separate lines, in brackets, or in separate definition bullet points.\n"
-            "   - ALWAYS format every regional or local dialect term directly inline using an HTML abbreviation tag with its English meaning in the title attribute: `<abbr title=\"Meaning of word\">RegionalTerm</abbr>`.\n"
-            "   - Examples:\n"
-            "     * Gujarat: `<abbr title=\"How are you? / I am great!\">Kem Cho? Majama!</abbr>`, `<abbr title=\"sweet-spicy mango pickle\">Chhundo</abbr>`, `<abbr title=\"savory snacks\">Farsan</abbr>`, `<abbr title=\"celebrate and enjoy life\">Jalsa Karo</abbr>`.\n"
-            "     * Goa: `<abbr title=\"relaxed, unhurried peaceful living\">Susegad</abbr>`, `<abbr title=\"friend / boss\">Patrao</abbr>`, `<abbr title=\"staple fish curry rice\">Xit Codi</abbr>`, `<abbr title=\"village baker\">Poder</abbr>`.\n"
-            "     * Mumbai: `<abbr title=\"Our Mumbai\">Aamchi Mumbai</abbr>`, `<abbr title=\"carefree and fearless\">Bindaas</abbr>`, `<abbr title=\"half cup strong spiced tea\">Cutting Chai</abbr>`, `<abbr title=\"clever quick-fix solution\">Jugaad</abbr>`.\n"
-            "     * Bangalore: `<abbr title=\"Please adjust a little bit\">Swalpa Adjust Maadi</abbr>`, `<abbr title=\"buddy / brother\">Maga</abbr>`, `<abbr title=\"savory breakfast snacks\">Thindi</abbr>`, `<abbr title=\"wholesome full meal\">Oota</abbr>`, `<abbr title=\"strong South Indian decoction coffee\">Filter Kaapi</abbr>`.\n"
-            "     * Uttar Pradesh: `<abbr title=\"loving spiritual greeting of Braj\">Radhe Radhe!</abbr>`, `<abbr title=\"After you, please (Awadhi courtesy)\">Pehle Aap</abbr>`, `<abbr title=\"refined elegance and hospitality\">Tehzeeb & Nazaakat</abbr>`, `<abbr title=\"magical dawn atmosphere of Varanasi\">Subah-e-Banaras</abbr>`.\n"
-            "3. DEEP TRAVEL KNOWLEDGE: Highlight both famous landmarks and lesser-known local gems (e.g., Vasco Saptah festival, Kakolem/Butterfly beaches, Khotachiwadi, Turahalli Forest, Polo Forest, Rani ki Vav, Dev Deepawali, Bateshwar).\n"
-            "4. MULTIMODAL IMAGE RECOGNITION: If the traveler has attached an image, visually identify the landmark, architectural style, deity, beach, or dish, and ground your response in its historical and regional context.\n"
-            "5. REAL-TIME AWARENESS: When Live Web Search context is provided, use it to give up-to-date festival dates, event timings, and seasonal tips.\n"
-            "6. CLEAN OUTPUT: Do NOT include raw bracketed citations like '[Source 1]' or append 'Source Citations:' lists, as sources are automatically rendered by the UI."
+            "   - Naturally incorporate authentic regional terms and greetings directly into sentences.\n"
+            "   - NEVER put regional words or definitions on separate lines or in definition bullet points.\n"
+            "   - ALWAYS format every regional or local dialect term directly inline using an HTML abbreviation tag with its exact English meaning in the title attribute: `<abbr title=\"Exact Meaning\">RegionalTerm</abbr>`.\n"
+            "   - ACCURACY IS MANDATORY: Only use regional terms and meanings if they are 100% culturally accurate. Never guess or invent meanings. Use this verified lexicon:\n"
+            "     * Goa (Konkani): <abbr title=\"May God bless you / Thank you\">Dev Borem Korum</abbr> (or Dev Bare Korun), <abbr title=\"Relaxed, contented, unhurried peaceful living\">Susegad</abbr>, <abbr title=\"Traditional Goan fish curry rice staple\">Xit Codi</abbr>, <abbr title=\"Village baker who delivers fresh bread on bicycle\">Poder</abbr>, <abbr title=\"Friend, respected master of the house\">Patrao</abbr>, <abbr title=\"Traditional distilled spirit from cashew apple or coconut toddy\">Feni</abbr>, <abbr title=\"Multi-layered Goan coconut milk dessert\">Bebinca</abbr>, <abbr title=\"How are you?\">Kitem Cholam?</abbr>, <abbr title=\"I am doing well\">Boro Aasa</abbr>.\n"
+            "     * Gujarat (Gujarati): <abbr title=\"How are you? / I am great!\">Kem Cho? Majama!</abbr>, <abbr title=\"Traditional savory snacks like dhokla, thepla, and khandvi\">Farsan</abbr>, <abbr title=\"Sweet and spicy grated mango pickle\">Chhundo</abbr>, <abbr title=\"Slow-cooked winter mixed vegetable delicacy with fenugreek dumplings\">Undhiyu</abbr>, <abbr title=\"Celebrate and enjoy life to the fullest!\">Jalsa Karo!</abbr>, <abbr title=\"Traditional greeting (Hail Lord Krishna)\">Jai Shri Krishna</abbr>.\n"
+            "     * Mumbai (Marathi / Bambaiya): <abbr title=\"Our Mumbai (phrase of pride and belonging)\">Aamchi Mumbai</abbr>, <abbr title=\"Carefree, fearless, and relaxed attitude\">Bindaas</abbr>, <abbr title=\"Half-cup strong spiced Indian tea\">Cutting Chai</abbr>, <abbr title=\"Clever, creative quick-fix workaround\">Jugaad</abbr>, <abbr title=\"Spicy sprouted lentil curry garnished with farsan and onions\">Misal Pav</abbr>, <abbr title=\"Iconic deep-fried spiced potato fritter in a bread bun\">Vada Pav</abbr>, <abbr title=\"Traditional respectful Marathi greeting\">Namaskar</abbr>.\n"
+            "     * Bangalore (Kannada / Local Slang): <abbr title=\"Please adjust a little bit (classic Bangalore expression of accommodation)\">Swalpa Adjust Maadi</abbr>, <abbr title=\"Close buddy, friend, or brother\">Maga</abbr>, <abbr title=\"Traditional South Indian savory breakfast items like idli, vada, and dosa\">Thindi</abbr>, <abbr title=\"Wholesome full traditional meal served with rice and sambar\">Oota</abbr>, <abbr title=\"Strong South Indian chicory-infused decoction coffee with frothed milk\">Filter Kaapi</abbr>, <abbr title=\"Crispy golden butter dosa famous in Karnataka\">Benne Dosa</abbr>, <abbr title=\"Quick-service vegetarian standing breakfast eateries\">Darshini</abbr>, <abbr title=\"Go safely and return soon (traditional warm farewell)\">Hogi Baa</abbr>, <abbr title=\"Warm respectful Kannada greeting\">Namaskara</abbr>.\n"
+            "     * Uttar Pradesh (Hindi / Awadhi / Braj): <abbr title=\"Loving devotional greeting and chant of Braj (Mathura-Vrindavan)\">Radhe Radhe!</abbr>, <abbr title=\"After you, please (emblematic of Lucknow's refined Awadhi courtesy)\">Pehle Aap</abbr>, <abbr title=\"Refined cultural elegance, polite etiquette, and hospitality\">Tehzeeb & Nazaakat</abbr>, <abbr title=\"Magical, serene dawn atmosphere along the Varanasi ghats\">Subah-e-Banaras</abbr>, <abbr title=\"Melt-in-the-mouth Awadhi spiced minced meat kebab\">Galouti Kebab</abbr>, <abbr title=\"Varanasi's winter saffron milk foam sweet garnished with pistachios\">Malaiyo</abbr>, <abbr title=\"Traditional respectful greeting\">Namaste</abbr>.\n"
+            "3. MULTIMODAL IMAGE RECOGNITION: If the traveler has attached an image, visually identify the landmark, architectural style, deity, beach, or dish, and ground your response in its historical and regional context.\n"
+            "4. REAL-TIME AWARENESS: When Live Web Search context is provided for our 5 states, use it to give up-to-date festival dates (e.g. Vasco Saptah, Dev Deepawali) and seasonal tips.\n"
+            "5. CLEAN OUTPUT: Do NOT include raw bracketed citations like '[Source 1]' or append 'Source Citations:' lists, as sources are automatically rendered by the UI."
         )
 
         full_prompt = f"""{system_instruction}
